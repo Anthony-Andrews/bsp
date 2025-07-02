@@ -36,7 +36,7 @@ jobs:
     strategy:
       matrix:
         targets: [linux]
-        profiles: [rk2410] # this is radxa's codename for cm5-io reference boards
+        profiles: [rk2312] # radxa's codename for cm5-io on 5.10 kernel
     steps:
       - name: Build
         uses: Anthony-Andrews/bsp@5.10
