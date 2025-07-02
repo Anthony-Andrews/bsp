@@ -7,7 +7,7 @@ inputs:
     required: true
   revision:
     required: false
-    default: 1
+    default: 'v1'
   artifacts:
     required: false
     default: 'false'
@@ -25,6 +25,7 @@ runs:
         submodules: true
     - name: Install dependency
       shell: bash
+      if: runner.name != 'buildserver'
       run: |
         sudo apt-get update
         sudo apt-get install --no-install-recommends -y qemu-user-static binfmt-support
@@ -40,7 +41,8 @@ runs:
       uses: actions/upload-artifact@v4
       with:
         name: ${{ inputs.target }}_${{ inputs.edition }}_${{ inputs.revision }}
-        path: .output
+        path: .output/
+        include-hidden-files: true
     - name: Upload
       if: inputs.release-id != '' && inputs.github-token != ''
       uses: xresloader/upload-to-github-release@v1
