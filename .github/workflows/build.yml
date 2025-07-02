@@ -1,4 +1,4 @@
-name: Build
+name: Build-rk2410
 on:
   workflow_dispatch:
 
