@@ -16,30 +16,30 @@ jobs:
         run: |
           echo "linux=$(./bsp json profile linux)" >> $GITHUB_OUTPUT
           echo "u-boot=$(./bsp json profile u-boot)" >> $GITHUB_OUTPUT
-#  build_u-boot:
-#    needs: query
-#    runs-on: self-hosted
-#    strategy:
-#      matrix:
-#        targets: [ u-boot ]
-#        profiles: ${{fromJSON(needs.query.outputs.u-boot)}}
-#    steps:
-#      - name: Build
-#        uses: Anthony-Andrews/bsp@main
-#        with:
-#          target: ${{ matrix.targets }}
-#          edition: ${{ matrix.profiles }}
-#          artifacts: true
+  # build_u-boot:
+  #   needs: query
+  #   runs-on: ubuntu-latest
+  #   strategy:
+  #     matrix:
+  #       targets: [ u-boot ]
+  #       profiles: ${{fromJSON(needs.query.outputs.u-boot)}}
+  #   steps:
+  #     - name: Build
+  #       uses: radxa-repo/bsp@main
+  #       with:
+  #         target: ${{ matrix.targets }}
+  #         edition: ${{ matrix.profiles }}
+  #         artifacts: true
   build_linux:
     needs: query
     runs-on: self-hosted
     strategy:
       matrix:
         targets: [linux]
-        profiles: [rk2312] # radxa's codename for cm5-io on 5.10 kernel
+        profiles: [rk358x]
     steps:
       - name: Build
-        uses: Anthony-Andrews/bsp@5.10
+        uses: Anthony-Andrews/bsp@6.1
         with:
           target: ${{ matrix.targets }}
           edition: ${{ matrix.profiles }}
