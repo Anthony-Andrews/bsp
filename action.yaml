@@ -21,11 +21,10 @@ runs:
     - name: Checkout
       uses: actions/checkout@v4
       with:
-        repository: iris-vision/bsp
+        repository: Anthony-Andrews/bsp
         submodules: true
     - name: Install dependency
       shell: bash
-      if: runner.name != 'AnthonyServer'
       run: |
         sudo apt-get update
         sudo apt-get install --no-install-recommends -y qemu-user-static binfmt-support
