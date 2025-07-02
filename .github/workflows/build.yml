@@ -1,4 +1,4 @@
-name: Build cm5-io 6.1
+name: Build
 on:
   workflow_dispatch:
 
@@ -44,13 +44,3 @@ jobs:
           target: ${{ matrix.targets }}
           edition: ${{ matrix.profiles }}
           artifacts: true
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          if-no-files-found: warn
-          compression-level: 6
-          overwrite: false
-          include-hidden-files: false
-          name: linux_rk2410_build
-          path: .output/*.deb
