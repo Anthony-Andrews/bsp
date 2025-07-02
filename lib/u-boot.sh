@@ -14,8 +14,6 @@ bsp_reset() {
     BSP_SOC_OVERRIDE=
     BSP_BL31_OVERRIDE=
     BSP_BL31_VARIANT=
-    BSP_BL32_OVERRIDE=
-    BSP_BL32_VARIANT=
     BSP_TRUST_OVERRIDE=
     BSP_BOARD_OVERRIDE=
     BSP_ROCKCHIP_TPL=
@@ -27,7 +25,6 @@ bsp_reset() {
     RKBIN_DDR=
     RKMINILOADER=
     UBOOT_BASE_ADDR=
-    RKBOOT_IDB=
     USE_ATF="false"
 
     BSP_MTK_LK_PROJECT=
@@ -45,7 +42,6 @@ bsp_prepare() {
 
     BSP_SOC_OVERRIDE="${BSP_SOC_OVERRIDE:-"$BSP_SOC"}"
     BSP_BL31_OVERRIDE="${BSP_BL31_OVERRIDE:-"$BSP_SOC"}"
-    BSP_BL32_OVERRIDE="${BSP_BL32_OVERRIDE:-"$BSP_SOC"}"
     BSP_TRUST_OVERRIDE="${BSP_TRUST_OVERRIDE:-"$BSP_SOC"}"
     BSP_BOARD_OVERRIDE="${BSP_BOARD_OVERRIDE:-"$BOARD"}"
 
@@ -56,7 +52,7 @@ bsp_prepare() {
                 BSP_DEFCONFIG="${BSP_BOARD_OVERRIDE}-${BSP_SOC}_defconfig"
                 ;;
             *)
-                BSP_DEFCONFIG="${BSP_BOARD_OVERRIDE}_defconfig"
+                BSP_DEFCONFIG="${BOARD}_defconfig"
                 ;;
         esac
     fi
@@ -85,20 +81,6 @@ bsp_prepare() {
                         echo "Using bl31 $(basename $rkbin_bl31)"
                         BSP_MAKE_EXTRA+=("BL31=$rkbin_bl31")
                     fi
-                fi
-
-                local rkbin_bl32
-                if [[ -n $BSP_BL32_OVERRIDE ]]
-                then
-                    if ! rkbin_bl32=$(find $SCRIPT_DIR/.src/rkbin/bin | grep -e "${BSP_BL32_OVERRIDE}_bl32_${BSP_BL32_VARIANT}" | sort | tail -n 1) || [[ -z $rkbin_bl32 ]]
-                    then
-                        echo "Unable to find prebuilt bl32. The resulting bootloader may not work." >&2
-                    else
-                        echo "Using bl32 $(basename $rkbin_bl32)"
-                        ln -sf "$rkbin_bl32" "$SCRIPT_DIR/.src/u-boot/tee.bin"
-                    fi
-                else
-                    rm -f "$SCRIPT_DIR/.src/u-boot/tee.bin"
                 fi
 
                 if [[ -n $RKBIN_DDR ]]
@@ -198,11 +180,6 @@ bsp_make() {
 
 rkpack_idbloader() {
     local flash_data=
-    if [[ -n $RKBOOT_IDB ]]
-    then
-        echo "Skip rkpack_idbloader. idbloader will be created by rkpack_rkboot."
-        return
-    fi
     if [[ -n $BSP_ROCKCHIP_TPL ]]
     then
         echo "Using rkbin $(basename $BSP_ROCKCHIP_TPL) as TPL"
@@ -218,6 +195,7 @@ rkpack_idbloader() {
         flash_data="${flash_data:+${flash_data}:}${SCRIPT_DIR}/.src/u-boot/spl/u-boot-spl.bin"
     fi
 
+    rm -f "$TARGET_DIR/idbloader.img" "$TARGET_DIR/idbloader-spi.img" "$TARGET_DIR/idbloader-spi_spl.img" "$TARGET_DIR/idbloader-sd_nand.img"
     $TARGET_DIR/tools/mkimage -n $BSP_SOC_OVERRIDE -T rksd -d "${flash_data}" "$TARGET_DIR/idbloader.img"
 
     if [[ "$1" == "rkminiloader" ]]
@@ -258,7 +236,7 @@ rkpack_rkminiloader() {
     mv ./trust.img "$TARGET_DIR/trust.img"
     popd
 
-    cp "$TARGET_DIR/uboot.img" "$TARGET_DIR/trust.img" "$SCRIPT_DIR/.root/usr/lib/u-boot/$BOARD/"
+    cp "$TARGET_DIR/uboot.img" "$TARGET_DIR/trust.img" "$SCRIPT_DIR/.root/usr/lib/u-boot/$BSP_BOARD_OVERRIDE/"
 }
 
 rkpack_rkboot() {
@@ -267,39 +245,10 @@ rkpack_rkboot() {
     local variant
     for variant in "" "_SPINOR" "_SPI_NAND" "_UART0_SD_NAND"
     do
-        local rkboot_ini="$SCRIPT_DIR/.src/rkbin/RKBOOT/${BSP_TRUST_OVERRIDE^^}MINIALL$variant.ini"
-
-        if [[ ! -f $rkboot_ini ]]
+        if [[ -f "$SCRIPT_DIR/.src/rkbin/RKBOOT/${BSP_TRUST_OVERRIDE^^}MINIALL$variant.ini" ]]
         then
-            continue
-        fi
-
-        if [[ -n $RKBOOT_IDB ]]
-        then
-            sed -i "s|FlashBoot=.*$|FlashBoot=${SCRIPT_DIR}/.src/u-boot/spl/u-boot-spl.bin|g" "$rkboot_ini"
-        fi
-
-        $SCRIPT_DIR/.src/rkbin/tools/boot_merger "$rkboot_ini"
-        mv ./*_loader_*.bin "$SCRIPT_DIR/.root/usr/lib/u-boot/$BOARD/rkboot$variant.bin"
-
-        if [[ -n $RKBOOT_IDB ]]
-        then
-            local idb_variant
-            case "$variant" in
-                "_SPINOR")
-                    idb_variant="-spi_spl"
-                    ;;
-                "_SPI_NAND")
-                    idb_variant="-spi_nand"
-                    ;;
-                "_UART0_SD_NAND")
-                    idb_variant="-sd_nand"
-                    ;;
-                "")
-                    idb_variant=""
-                    ;;
-            esac
-            mv ./"$RKBOOT_IDB"* "$TARGET_DIR/idbloader$idb_variant.img"
+            $SCRIPT_DIR/.src/rkbin/tools/boot_merger "$SCRIPT_DIR/.src/rkbin/RKBOOT/${BSP_TRUST_OVERRIDE^^}MINIALL$variant.ini"
+            mv ./*_loader_*.bin "$SCRIPT_DIR/.root/usr/lib/u-boot/$BSP_BOARD_OVERRIDE/rkboot$variant.bin"
         fi
     done
     popd
@@ -308,10 +257,10 @@ rkpack_rkboot() {
 bsp_preparedeb() {
     local soc_family=$(get_soc_family $BSP_SOC)
     
-    mkdir -p "$SCRIPT_DIR/.root/usr/lib/u-boot/$BOARD"
-    cp "$SCRIPT_DIR/common/u-boot_setup-$soc_family.sh" "$SCRIPT_DIR/.root/usr/lib/u-boot/$BOARD/setup.sh"
+    mkdir -p "$SCRIPT_DIR/.root/usr/lib/u-boot/$BSP_BOARD_OVERRIDE"
+    cp "$SCRIPT_DIR/common/u-boot_setup-$soc_family.sh" "$SCRIPT_DIR/.root/usr/lib/u-boot/$BSP_BOARD_OVERRIDE/setup.sh"
     if [[ -f "$SCRIPT_DIR/common/u-boot_setup-$soc_family.ps1" ]]; then
-        cp "$SCRIPT_DIR/common/u-boot_setup-$soc_family.ps1" "$SCRIPT_DIR/.root/usr/lib/u-boot/$BOARD/setup.ps1"
+        cp "$SCRIPT_DIR/common/u-boot_setup-$soc_family.ps1" "$SCRIPT_DIR/.root/usr/lib/u-boot/$BSP_BOARD_OVERRIDE/setup.ps1"
     fi
 
     case "$soc_family" in
@@ -319,26 +268,25 @@ bsp_preparedeb() {
             make -C "$SCRIPT_DIR/.src/fip" -j$(nproc) distclean
             make -C "$SCRIPT_DIR/.src/fip" -j$(nproc) fip BOARD=$BSP_BOARD_OVERRIDE UBOOT_BIN="$TARGET_DIR/u-boot.bin"
 
-            cp "$SCRIPT_DIR/.src/fip/$BSP_BOARD_OVERRIDE/u-boot.bin" "$SCRIPT_DIR/.src/fip/$BSP_BOARD_OVERRIDE/u-boot.bin.sd.bin" "$SCRIPT_DIR/.root/usr/lib/u-boot/$BOARD/"
+            cp "$SCRIPT_DIR/.src/fip/$BSP_BOARD_OVERRIDE/u-boot.bin" "$SCRIPT_DIR/.src/fip/$BSP_BOARD_OVERRIDE/u-boot.bin.sd.bin" "$SCRIPT_DIR/.root/usr/lib/u-boot/$BSP_BOARD_OVERRIDE/"
             ;;
         rockchip)
-            rm -f "$TARGET_DIR/idbloader.img" "$TARGET_DIR/idbloader-spi.img" "$TARGET_DIR/idbloader-spi_spl.img" "$TARGET_DIR/idbloader-sd_nand.img"
             if [[ -z "$RKMINILOADER" ]]
             then
                 echo "No RKMINILOADER specified. Require prepacked u-boot.itb."
                 rkpack_idbloader "spl"
-                cp "$TARGET_DIR/u-boot.itb" "$SCRIPT_DIR/.root/usr/lib/u-boot/$BOARD/"
+                cp "$TARGET_DIR/u-boot.itb" "$SCRIPT_DIR/.root/usr/lib/u-boot/$BSP_BOARD_OVERRIDE/"
             else
                 echo "Packaging U-Boot with Rockchip Miniloader"
                 rkpack_idbloader "rkminiloader"
                 rkpack_rkminiloader
             fi
             rkpack_rkboot
-            cp "$TARGET_DIR/idbloader-spi"*".img" "$TARGET_DIR/idbloader-sd"*".img" "$TARGET_DIR/idbloader.img" "$SCRIPT_DIR/.root/usr/lib/u-boot/$BOARD/"
+            cp "$TARGET_DIR/idbloader-spi"*".img" "$TARGET_DIR/idbloader-sd"*".img" "$TARGET_DIR/idbloader.img" "$SCRIPT_DIR/.root/usr/lib/u-boot/$BSP_BOARD_OVERRIDE/"
             ;;
         mediatek)
-            cp "$SCRIPT_DIR/.src/mtk-atf/build/$BSP_BL31_OVERRIDE/release/bl2.bin" "$SCRIPT_DIR/.root/usr/lib/u-boot/$BOARD/"
-            truncate -s%4 "$SCRIPT_DIR/.root/usr/lib/u-boot/$BOARD/bl2.bin"
+            cp "$SCRIPT_DIR/.src/mtk-atf/build/$BSP_BL31_OVERRIDE/release/bl2.bin" "$SCRIPT_DIR/.root/usr/lib/u-boot/$BSP_BOARD_OVERRIDE/"
+            truncate -s%4 "$SCRIPT_DIR/.root/usr/lib/u-boot/$BSP_BOARD_OVERRIDE/bl2.bin"
 
             local media="emmc"
             if "$BSP_UFS_BOOT"
@@ -346,13 +294,13 @@ bsp_preparedeb() {
                 media="ufs"
             fi
             "$TARGET_DIR/tools/mkimage" -T mtk_image -a 0x201000 -e 0x201000 -n "media=$media;arm64=1" \
-                -d "$SCRIPT_DIR/.root/usr/lib/u-boot/$BOARD/bl2.bin" \
-                "$SCRIPT_DIR/.root/usr/lib/u-boot/$BOARD/bl2.img"
-            rm "$SCRIPT_DIR/.root/usr/lib/u-boot/$BOARD/bl2.bin"
+                -d "$SCRIPT_DIR/.root/usr/lib/u-boot/$BSP_BOARD_OVERRIDE/bl2.bin" \
+                "$SCRIPT_DIR/.root/usr/lib/u-boot/$BSP_BOARD_OVERRIDE/bl2.img"
+            rm "$SCRIPT_DIR/.root/usr/lib/u-boot/$BSP_BOARD_OVERRIDE/bl2.bin"
 
-            cp "$SCRIPT_DIR/.src/lk-prebuilt/$BSP_MTK_LK_PROJECT/lk.bin" "$SCRIPT_DIR/.root/usr/lib/u-boot/$BOARD/"
+            cp "$SCRIPT_DIR/.src/lk-prebuilt/$BSP_MTK_LK_PROJECT/lk.bin" "$SCRIPT_DIR/.root/usr/lib/u-boot/$BSP_BOARD_OVERRIDE/"
 
-            cp "$TARGET_DIR/u-boot.bin" "$TARGET_DIR/u-boot-mtk.bin" "$SCRIPT_DIR/.root/usr/lib/u-boot/$BOARD/"
+            cp "$TARGET_DIR/u-boot.bin" "$TARGET_DIR/u-boot-mtk.bin" "$SCRIPT_DIR/.root/usr/lib/u-boot/$BSP_BOARD_OVERRIDE/"
             ;;
         *)
             error $EXIT_UNSUPPORTED_OPTION "$soc_family"
