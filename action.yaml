@@ -6,7 +6,7 @@ inputs:
   edition:
     required: true
   revision:
-    retuired: false
+    required: false
     default: 1
   artifacts:
     required: false
@@ -21,7 +21,7 @@ runs:
     - name: Checkout
       uses: actions/checkout@v4
       with:
-        repository: radxa-repo/bsp
+        repository: Anthony-Andrews/bsp
         submodules: true
     - name: Install dependency
       shell: bash
