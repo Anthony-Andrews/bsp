@@ -1,5 +1,6 @@
 name: bsp
 description: Radxa BSP Build Tool
+
 inputs:
   target:
     required: true
@@ -15,6 +16,7 @@ inputs:
     required: false
   github-token:
     required: false
+
 runs:
   using: "composite"
   steps:
@@ -23,12 +25,14 @@ runs:
       with:
         repository: Anthony-Andrews/bsp
         submodules: true
+
     - name: Install dependency
       shell: bash
       if: runner.name != 'buildserver'
       run: |
         sudo apt-get update
         sudo apt-get install --no-install-recommends -y qemu-user-static binfmt-support
+
     - name: Build
       shell: bash
       run: |
@@ -36,21 +40,29 @@ runs:
         pushd .output
         ../bsp --long-version -r ${{ inputs.revision }} ${{ inputs.target }} ${{ inputs.edition }}
         popd
-    - name: Upload artifacts
-      if: inputs.artifacts == 'true' && inputs.board != 'rootfs'
+
+    - name: Zip output
+      if: inputs.artifacts == 'true' && inputs.target != 'rootfs'
+      shell: bash
+      run: |
+        zip -r bsp_output.zip .output
+
+    - name: Upload zipped artifacts
+      if: inputs.artifacts == 'true' && inputs.target != 'rootfs'
       uses: actions/upload-artifact@v4
       with:
         name: ${{ inputs.target }}_${{ inputs.edition }}_${{ inputs.revision }}
-        path: .output/
-        include-hidden-files: true
-    - name: Upload
+        path: bsp_output.zip
+
+    - name: Upload to GitHub Release
       if: inputs.release-id != '' && inputs.github-token != ''
       uses: xresloader/upload-to-github-release@v1
       env:
-          GITHUB_TOKEN: ${{ inputs.github-token }}
+        GITHUB_TOKEN: ${{ inputs.github-token }}
       with:
         release_id: ${{ inputs.release-id }}
-        file: .output/*
+        file: bsp_output.zip
+
     - name: Rollback release
       if: failure() && inputs.release-id != '' && inputs.github-token != ''
       uses: author/action-rollback@stable
