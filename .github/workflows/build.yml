@@ -39,7 +39,7 @@ jobs:
         profiles: [rk2410] # this is radxa's codename for cm5-io reference boards
     steps:
       - name: Build
-        uses: Anthony-Andrews/bsp@main
+        uses: Anthony-Andrews/bsp@6.1
         with:
           target: ${{ matrix.targets }}
           edition: ${{ matrix.profiles }}
