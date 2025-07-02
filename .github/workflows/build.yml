@@ -39,7 +39,7 @@ jobs:
         profiles: [rk358x]
     steps:
       - name: Build
-        uses: Anthony-Andrews/bsp@5.10
+        uses: Anthony-Andrews/bsp@6.1
         with:
           target: ${{ matrix.targets }}
           edition: ${{ matrix.profiles }}
