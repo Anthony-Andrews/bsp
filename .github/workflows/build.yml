@@ -44,3 +44,21 @@ jobs:
           target: ${{ matrix.targets }}
           edition: ${{ matrix.profiles }}
           artifacts: true
+
+      - name: List output directory contents
+        run: |
+          pwd
+          ls -la
+          ls -la .output || ls -la output || echo "No output directory found"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          if-no-files-found: warn
+          compression-level: 6
+          overwrite: false
+          include-hidden-files: false
+          name: linux_rk2410_build
+          path: |
+            .output/**
+            output/**
